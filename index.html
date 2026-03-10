@@ -1505,16 +1505,13 @@ async function createTeamFromPage() {
 }
 
 async function _createTeam(name) {
-  const arr = await sbFetch('teams', {
-    method: 'POST',
-    body: JSON.stringify({ name, created_by: currentUser.id })
-  }).catch(e => { toast(e.message, true); return null; });
-  if (!arr) return;
-  const team = Array.isArray(arr) ? arr[0] : arr;
-  await sbFetch('team_members', {
-    method: 'POST',
-    body: JSON.stringify({ team_id: team.id, user_id: currentUser.id, role: 'admin' })
-  });
+  const { data: team, error } = await sb.from('teams')
+    .insert({ name, created_by: currentUser.id })
+    .select().single();
+  if (error) { toast(error.message, true); return; }
+  const { error: err2 } = await sb.from('team_members')
+    .insert({ team_id: team.id, user_id: currentUser.id, role: 'admin' });
+  if (err2) { toast(err2.message, true); return; }
   userTeams.push({ ...team, role: 'admin' });
   toast(`Équipe "${name}" créée ✓`);
 }
