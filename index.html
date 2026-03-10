@@ -2421,13 +2421,24 @@ async function sbFetchCount(table) {
 async function loadAdminUsers() {
   const container = document.getElementById('admin-tab-users');
   container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
-
   const users = await sbFetch('profiles?select=id,display_name,email,is_admin,created_at&order=created_at.desc').catch(() => []);
 
-  let html = `<table class="admin-table">
-    <thead><tr>
-      <th>Utilisateur</th><th>Email</th><th>Inscription</th><th>Rôle</th><th></th>
-    </tr></thead><tbody>`;
+  // Formulaire de création
+  let html = `<div style="display:flex;gap:8px;margin-bottom:20px;align-items:flex-end;">
+    <div style="flex:1;">
+      <label style="font-size:11px;font-weight:600;color:var(--ink-faint);display:block;margin-bottom:4px;">EMAIL</label>
+      <input id="admin-new-email" type="email" placeholder="prenom.nom@reseau-canope.fr" style="width:100%;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="flex:1;">
+      <label style="font-size:11px;font-weight:600;color:var(--ink-faint);display:block;margin-bottom:4px;">NOM AFFICHÉ</label>
+      <input id="admin-new-name" type="text" placeholder="Prénom Nom" style="width:100%;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;box-sizing:border-box;">
+    </div>
+    <button class="btn btn-accent btn-sm" onclick="adminCreateUser()" style="white-space:nowrap;">+ Créer un compte</button>
+  </div>`;
+
+  html += `<table class="admin-table"><thead><tr>
+    <th>Utilisateur</th><th>Email</th><th>Inscription</th><th>Rôle</th><th></th>
+  </tr></thead><tbody>`;
 
   users.forEach(u => {
     const name = u.display_name || u.email?.split('@')[0] || '—';
@@ -2438,8 +2449,9 @@ async function loadAdminUsers() {
       <td style="color:var(--ink-faint);">${u.email || '—'}</td>
       <td style="color:var(--ink-faint);">${date}</td>
       <td>${u.is_admin ? '<span style="color:#f47920;font-weight:600;">Admin</span>' : 'Membre'}</td>
-      <td style="text-align:right;">
+      <td style="text-align:right;white-space:nowrap;display:flex;gap:4px;justify-content:flex-end;">
         ${!isMe ? `<button class="btn btn-ghost btn-sm" onclick="toggleAdmin('${u.id}',${u.is_admin},'${name}')">${u.is_admin ? 'Retirer admin' : 'Rendre admin'}</button>` : ''}
+        ${!isMe ? `<button class="btn btn-danger btn-sm" onclick="adminDeleteUser('${u.id}','${name}')">Supprimer</button>` : ''}
       </td>
     </tr>`;
   });
@@ -2448,16 +2460,46 @@ async function loadAdminUsers() {
   container.innerHTML = html;
 }
 
+async function adminCreateUser() {
+  const email = document.getElementById('admin-new-email').value.trim();
+  const name  = document.getElementById('admin-new-name').value.trim();
+  if (!email) { toast('Email obligatoire', true); return; }
+
+  // Inviter via Supabase Auth (envoie un email de connexion)
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { data: { display_name: name }, emailRedirectTo: 'https://bfbf-test.github.io/rcap/' }
+  });
+  if (error) { toast(error.message, true); return; }
+  toast(`Invitation envoyée à ${email} ✓`);
+  document.getElementById('admin-new-email').value = '';
+  document.getElementById('admin-new-name').value = '';
+}
+
+async function adminDeleteUser(userId, name) {
+  if (!confirm(`Supprimer définitivement le compte de ${name} ?`)) return;
+  // Supprimer les données
+  const wls = await sbFetch(`watchlists?owner_id=eq.${userId}&select=id`).catch(() => []);
+  const ids = wls.map(w => w.id);
+  if (ids.length) {
+    await sbFetch(`articles?watchlist_id=in.(${ids.join(',')})`, { method: 'DELETE' }).catch(() => {});
+    await sbFetch(`feeds?watchlist_id=in.(${ids.join(',')})`, { method: 'DELETE' }).catch(() => {});
+    await sbFetch(`watchlists?owner_id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
+  }
+  await sbFetch(`team_members?user_id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
+  await sbFetch(`profiles?id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
+  toast(`Compte de ${name} supprimé ✓`);
+  loadAdminUsers();
+}
+
 async function loadAdminSpaces() {
   const container = document.getElementById('admin-tab-spaces');
   container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
-
   const spaces = await sbFetch('watchlists?select=id,name,scope,created_at,owner_id,profiles(display_name,email)&order=created_at.desc').catch(() => []);
 
-  let html = `<table class="admin-table">
-    <thead><tr>
-      <th>Espace</th><th>Créateur</th><th>Type</th><th>Date</th>
-    </tr></thead><tbody>`;
+  let html = `<table class="admin-table"><thead><tr>
+    <th>Espace</th><th>Créateur</th><th>Type</th><th>Date</th><th></th>
+  </tr></thead><tbody>`;
 
   spaces.forEach(w => {
     const owner = w.profiles?.display_name || w.profiles?.email?.split('@')[0] || '—';
@@ -2467,6 +2509,9 @@ async function loadAdminSpaces() {
       <td style="color:var(--ink-faint);">${owner}</td>
       <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${w.scope==='team'?'#fff3e8;color:#f47920':'#e8f0fb;color:#1b3a6b'};">${w.scope==='team'?'Équipe':'Personnel'}</span></td>
       <td style="color:var(--ink-faint);">${date}</td>
+      <td style="text-align:right;">
+        <button class="btn btn-danger btn-sm" onclick="adminDeleteSpace('${w.id}','${w.name.replace(/'/g,"\\'")}')">Supprimer</button>
+      </td>
     </tr>`;
   });
 
@@ -2474,31 +2519,109 @@ async function loadAdminSpaces() {
   container.innerHTML = html;
 }
 
+async function adminDeleteSpace(id, name) {
+  if (!confirm(`Supprimer l'espace "${name}" et tous ses articles ?`)) return;
+  await sbFetch(`articles?watchlist_id=eq.${id}`, { method: 'DELETE' }).catch(() => {});
+  await sbFetch(`feeds?watchlist_id=eq.${id}`, { method: 'DELETE' }).catch(() => {});
+  await sbFetch(`watchlists?id=eq.${id}`, { method: 'DELETE' }).catch(() => {});
+  toast(`Espace "${name}" supprimé ✓`);
+  loadAdminSpaces();
+}
+
 async function loadAdminTeams() {
   const container = document.getElementById('admin-tab-teams-admin');
   container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
 
-  const teams = await sbFetch('teams?select=id,name,created_at,profiles(display_name,email)&order=created_at.desc').catch(() => []);
+  // Formulaire de création d'équipe
+  let html = `<div style="display:flex;gap:8px;margin-bottom:20px;">
+    <input id="admin-new-team" type="text" placeholder="Nom de la nouvelle équipe…"
+      style="flex:1;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;">
+    <button class="btn btn-accent btn-sm" onclick="adminCreateTeam()">+ Créer une équipe</button>
+  </div>`;
 
-  let html = `<table class="admin-table">
-    <thead><tr>
-      <th>Équipe</th><th>Créateur</th><th>Membres</th><th>Date</th>
-    </tr></thead><tbody>`;
+  const teams = await sbFetch('teams?select=id,name,created_at,created_by&order=created_at.desc').catch(() => []);
+  const allUsers = await sbFetch('profiles?select=id,display_name,email').catch(() => []);
 
   for (const t of teams) {
-    const creator = t.profiles?.display_name || t.profiles?.email?.split('@')[0] || '—';
+    const creator = allUsers.find(u => u.id === t.created_by);
+    const creatorName = creator?.display_name || creator?.email?.split('@')[0] || '—';
     const date = t.created_at ? new Date(t.created_at).toLocaleDateString('fr-FR') : '—';
-    const members = await sbFetch(`team_members?team_id=eq.${t.id}&select=id`).catch(() => []);
-    html += `<tr>
-      <td><strong>${t.name}</strong></td>
-      <td style="color:var(--ink-faint);">${creator}</td>
-      <td>${members.length} membre${members.length > 1 ? 's' : ''}</td>
-      <td style="color:var(--ink-faint);">${date}</td>
-    </tr>`;
+    const members = await sbFetch(`team_members?team_id=eq.${t.id}&select=user_id,role`).catch(() => []);
+
+    html += `<div style="border:1.5px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--border);">
+        <div>
+          <strong>${t.name}</strong>
+          <span style="font-size:11px;color:var(--ink-faint);margin-left:8px;">Créée par ${creatorName} · ${date}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="adminDeleteTeam('${t.id}','${t.name.replace(/'/g,"\\'")}')">Supprimer</button>
+      </div>
+      <div style="padding:12px 16px;">
+        <div style="font-size:11px;font-weight:600;color:var(--ink-faint);margin-bottom:8px;">MEMBRES (${members.length})</div>`;
+
+    members.forEach(m => {
+      const u = allUsers.find(u => u.id === m.user_id);
+      const uName = u?.display_name || u?.email?.split('@')[0] || '—';
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border-soft);">
+        <span style="font-size:13px;">${uName} <span style="font-size:11px;color:var(--ink-faint);">${u?.email || ''}</span></span>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <span style="font-size:11px;color:var(--ink-faint);">${m.role === 'admin' ? 'Admin' : 'Membre'}</span>
+          <button class="btn btn-danger btn-sm" style="padding:2px 8px;" onclick="adminRemoveFromTeam('${t.id}','${m.user_id}','${uName}')">Retirer</button>
+        </div>
+      </div>`;
+    });
+
+    // Sélecteur pour ajouter un membre
+    const nonMembers = allUsers.filter(u => !members.find(m => m.user_id === u.id));
+    html += `<div style="display:flex;gap:8px;margin-top:10px;">
+      <select id="add-member-${t.id}" style="flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;">
+        <option value="">Ajouter un membre…</option>
+        ${nonMembers.map(u => `<option value="${u.id}">${u.display_name || u.email?.split('@')[0]} (${u.email})</option>`).join('')}
+      </select>
+      <button class="btn btn-ghost btn-sm" onclick="adminAddToTeam('${t.id}')">Ajouter</button>
+    </div>`;
+
+    html += `</div></div>`;
   }
 
-  html += '</tbody></table>';
   container.innerHTML = html;
+}
+
+async function adminCreateTeam() {
+  const name = document.getElementById('admin-new-team').value.trim();
+  if (!name) return;
+  const { error } = await sb.from('teams').insert({ name, created_by: currentUser.id });
+  if (error) { toast(error.message, true); return; }
+  toast(`Équipe "${name}" créée ✓`);
+  await loadAll();
+  loadAdminTeams();
+}
+
+async function adminDeleteTeam(teamId, teamName) {
+  if (!confirm(`Supprimer l'équipe "${teamName}" ?`)) return;
+  await sbFetch(`team_members?team_id=eq.${teamId}`, { method: 'DELETE' }).catch(() => {});
+  const { error } = await sb.from('teams').delete().eq('id', teamId);
+  if (error) { toast(error.message, true); return; }
+  toast(`Équipe "${teamName}" supprimée ✓`);
+  await loadAll();
+  loadAdminTeams();
+}
+
+async function adminAddToTeam(teamId) {
+  const sel = document.getElementById(`add-member-${teamId}`);
+  const userId = sel.value;
+  if (!userId) return;
+  const { error } = await sb.from('team_members').insert({ team_id: teamId, user_id: userId, role: 'member' });
+  if (error) { toast(error.message, true); return; }
+  toast('Membre ajouté ✓');
+  loadAdminTeams();
+}
+
+async function adminRemoveFromTeam(teamId, userId, name) {
+  if (!confirm(`Retirer ${name} de cette équipe ?`)) return;
+  await sb.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId);
+  toast(`${name} retiré ✓`);
+  loadAdminTeams();
 }
 
 async function toggleAdmin(userId, currentlyAdmin, name) {
@@ -2506,7 +2629,7 @@ async function toggleAdmin(userId, currentlyAdmin, name) {
   const { error } = await sb.from('profiles').update({ is_admin: !currentlyAdmin }).eq('id', userId);
   if (error) { toast(error.message, true); return; }
   toast(`${name} ${currentlyAdmin ? "n'est plus admin" : "est maintenant admin"} ✓`);
-  await loadAdminUsers();
+  loadAdminUsers();
 }
 
 // ─────────────────────────────────────────
