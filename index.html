@@ -644,6 +644,12 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
 
     <div id="sidebar-teams-container"></div>
 
+    <div class="sidebar-section" style="padding-top:8px;">
+      <div class="sidebar-footer-link" onclick="showPage('search')" style="color:rgba(255,255,255,0.5);padding:7px 8px;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Recherche globale
+      </div>
+    </div>
     <div class="sidebar-footer">
       <div class="sidebar-footer-link" onclick="showPage('account')"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M2 12c0-2.2 2.2-4 5-4s5 1.8 5 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg> Mon compte</div>
       <div class="sidebar-footer-link" onclick="showPage('teams')">
@@ -916,6 +922,30 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
     </div>
 
     <!-- ── PAGE : ÉQUIPES ── -->
+    <!-- ════════════════════════════════════════
+         PAGE : RECHERCHE GLOBALE
+    ════════════════════════════════════════ -->
+    <div id="page-search" class="page main-content">
+      <div style="max-width:720px;margin:0 auto;">
+        <div style="display:flex;gap:10px;margin-bottom:24px;">
+          <div class="search-box" style="flex:1;border:1.5px solid var(--border);border-radius:var(--radius);background:var(--white);padding:0 12px;">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <input id="global-search-input" type="text" placeholder="Rechercher dans tous vos espaces…"
+              style="flex:1;border:none;outline:none;font-family:inherit;font-size:14px;background:transparent;padding:11px 0;"
+              oninput="globalSearch(this.value)">
+          </div>
+          <select id="global-search-period" onchange="globalSearch(document.getElementById('global-search-input').value)"
+            style="padding:0 12px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;background:var(--white);cursor:pointer;">
+            <option value="7">7 jours</option>
+            <option value="30">30 jours</option>
+            <option value="90">3 mois</option>
+            <option value="0">Tout</option>
+          </select>
+        </div>
+        <div id="global-search-results"></div>
+      </div>
+    </div>
+
     <div id="page-teams" class="page main-content">
       <div class="form-container">
         <div class="form-section">
@@ -1111,6 +1141,7 @@ function showPage(name) {
     teams: 'Gérer les <em>équipes</em>',
     account: 'Mon <em>compte</em>',
     admin: '<em>Administration</em>',
+    search: '<em>Recherche</em> globale',
   };
   if (name in titles) {
     document.getElementById('topbar-title').innerHTML = titles[name];
@@ -1121,6 +1152,7 @@ function showPage(name) {
   if (name === 'account') initAccountPage();
   if (name === 'teams') loadTeamsPage();
   if (name === 'admin') loadAdminPage();
+  if (name === 'search') setTimeout(() => document.getElementById('global-search-input')?.focus(), 100);
 
   // Sidebar actif
   document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
@@ -1597,6 +1629,84 @@ function searchArticles(query) {
   renderArticles(allArticles.filter(a =>
     a.title?.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q)
   ));
+}
+
+async function globalSearch(query) {
+  const results = document.getElementById('global-search-results');
+  const q = query.trim().toLowerCase();
+  if (!q) {
+    results.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;text-align:center;padding:40px 0;">Tapez un mot pour rechercher dans tous vos espaces.</p>';
+    return;
+  }
+
+  results.innerHTML = '<p style="color:var(--ink-faint);font-size:13px;padding:8px 0;">Recherche en cours…</p>';
+
+  const days = parseInt(document.getElementById('global-search-period').value);
+  let qs = 'articles?select=id,title,url,description,published_at,feed_id,watchlist_id,read_by,feeds(label,url),watchlists(name)&order=published_at.desc&limit=100';
+  if (days > 0) {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    qs += `&published_at=gte.${since.toISOString()}`;
+  }
+
+  const data = await sbFetch(qs).catch(() => []);
+  const filtered = (data || []).filter(a =>
+    a.title?.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q)
+  );
+
+  if (filtered.length === 0) {
+    results.innerHTML = `<div class="empty-state"><svg width="40" height="40" viewBox="0 0 48 48" fill="none"><circle cx="22" cy="22" r="14" stroke="currentColor" stroke-width="2"/><path d="M31 31L42 42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><h3>Aucun résultat</h3><p>Aucun article ne correspond à "<strong>${query}</strong>".</p></div>`;
+    return;
+  }
+
+  // Grouper par espace
+  const bySpace = {};
+  filtered.forEach(a => {
+    const spaceName = a.watchlists?.name || '—';
+    if (!bySpace[spaceName]) bySpace[spaceName] = [];
+    bySpace[spaceName].push(a);
+  });
+
+  let html = `<div style="font-size:12px;color:var(--ink-faint);margin-bottom:16px;">${filtered.length} résultat${filtered.length>1?'s':''} pour "<strong style="color:var(--ink);">${query}</strong>"</div>`;
+
+  Object.entries(bySpace).forEach(([space, arts]) => {
+    html += `<div style="margin-bottom:24px;">
+      <div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px;">${space}</div>`;
+    arts.forEach(a => {
+      const isRead = (a.read_by || []).includes(currentUser.id);
+      const srcLabel = a.feeds?.label || a.feeds?.url || '—';
+      const date = relativeDate(a.published_at);
+      // Surligner le mot recherché
+      const esc = q.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&');
+      const titleHl = (a.title || '').replace(new RegExp(`(${esc})`, 'gi'),
+        '<mark style="background:#fff0b3;color:inherit;border-radius:2px;padding:0 1px;">$1</mark>');
+      const descRaw = (a.description || '').slice(0, 200);
+      const descHl = descRaw.replace(new RegExp(`(${esc})`, 'gi'),
+        '<mark style="background:#fff0b3;color:inherit;border-radius:2px;padding:0 1px;">$1</mark>');
+      html += `<div class="article-item${isRead?' is-read':''}" style="margin-bottom:2px;" onclick="window.open('${a.url}','_blank');markReadGlobal('${a.id}',this)">
+        <div style="width:6px;height:6px;border-radius:50%;background:${isRead?'transparent':'var(--navy)'};margin-top:5px;flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:11px;color:var(--ink-faint);margin-bottom:3px;">${srcLabel}</div>
+          <div class="article-title" style="cursor:pointer;">${titleHl}</div>
+          ${descHl ? `<div class="article-desc">${descHl}…</div>` : ''}
+        </div>
+        <div class="article-date">${date}</div>
+      </div>`;
+    });
+    html += '</div>';
+  });
+
+  results.innerHTML = html;
+}
+
+async function markReadGlobal(articleId, item) {
+  item.classList.add('is-read');
+  const dot = item.querySelector('div[style*="border-radius:50%"]');
+  if (dot) dot.style.background = 'transparent';
+  await sbFetch(`articles?id=eq.${articleId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ read_by: [currentUser.id] }),
+  }).catch(() => {});
 }
 
 function toggleSelect(e, id) {
