@@ -284,6 +284,15 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
   border-radius:var(--radius); padding:24px; margin-bottom:16px;
 }
 .form-section-title { font-family:'Source Serif 4',serif; font-size:16px; margin-bottom:4px; }
+.admin-stat-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); padding:16px; text-align:center; }
+.admin-stat-card .stat-val { font-size:28px; font-weight:700; color:var(--navy); }
+.admin-stat-card .stat-lbl { font-size:11px; color:var(--ink-faint); margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
+.admin-tab { background:none; border:none; padding:10px 16px; font-family:inherit; font-size:13px; cursor:pointer; color:var(--ink-faint); border-bottom:2px solid transparent; margin-bottom:-2px; }
+.admin-tab.active { color:var(--navy); border-bottom-color:var(--navy); font-weight:600; }
+.admin-table { width:100%; border-collapse:collapse; font-size:13px; }
+.admin-table th { text-align:left; padding:8px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); border-bottom:2px solid var(--border); }
+.admin-table td { padding:10px 12px; border-bottom:1px solid var(--border-soft); vertical-align:middle; }
+.admin-table tr:hover td { background:var(--surface); }
 .form-section-desc  { font-size:12px; color:var(--ink-faint); margin-bottom:20px; }
 
 .scope-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
@@ -561,6 +570,10 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/><circle cx="9.5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.3"/><path d="M1 12c0-2 1.8-3.5 4-3.5M7 12c0-2 1.8-3.5 4-3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         Gérer les équipes
       </div>
+      <div class="sidebar-footer-link hidden" id="sidebar-admin-link" onclick="showPage('admin')" style="color:#f47920;">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="1" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.3"/><path d="M4 7h6M4 4.5h6M4 9.5h4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        Administration
+      </div>
       <div class="sidebar-footer-link" onclick="doLogout()">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M5 7h7M9.5 4.5L12 7l-2.5 2.5M2 2v10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
         Déconnexion
@@ -771,6 +784,36 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
     </div>
 
 
+    <!-- ── PAGE : ADMIN ── -->
+    <div id="page-admin" class="page main-content">
+      <div class="form-container" style="max-width:900px;">
+
+        <!-- Stats globales -->
+        <div class="form-section">
+          <div class="form-section-title">Vue d'ensemble</div>
+          <div id="admin-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:4px;">
+            <div class="admin-stat-card" id="stat-users"><div class="stat-val">—</div><div class="stat-lbl">Utilisateurs</div></div>
+            <div class="admin-stat-card" id="stat-spaces"><div class="stat-val">—</div><div class="stat-lbl">Espaces</div></div>
+            <div class="admin-stat-card" id="stat-teams"><div class="stat-val">—</div><div class="stat-lbl">Équipes</div></div>
+            <div class="admin-stat-card" id="stat-articles"><div class="stat-val">—</div><div class="stat-lbl">Articles</div></div>
+          </div>
+        </div>
+
+        <!-- Onglets -->
+        <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0;">
+          <button class="admin-tab active" id="tab-users" onclick="showAdminTab('users')">Utilisateurs</button>
+          <button class="admin-tab" id="tab-spaces" onclick="showAdminTab('spaces')">Espaces</button>
+          <button class="admin-tab" id="tab-teams-admin" onclick="showAdminTab('teams-admin')">Équipes</button>
+        </div>
+
+        <!-- Contenu onglets -->
+        <div id="admin-tab-users"></div>
+        <div id="admin-tab-spaces" style="display:none;"></div>
+        <div id="admin-tab-teams-admin" style="display:none;"></div>
+
+      </div>
+    </div>
+
     <!-- ── PAGE : ÉQUIPES ── -->
     <div id="page-teams" class="page main-content">
       <div class="form-container">
@@ -944,6 +987,7 @@ function showPage(name) {
     create: 'Créer un <em>espace de veille</em>',
     teams: 'Gérer les <em>équipes</em>',
     account: 'Mon <em>compte</em>',
+    admin: '<em>Administration</em>',
   };
   if (name in titles) {
     document.getElementById('topbar-title').innerHTML = titles[name];
@@ -952,6 +996,8 @@ function showPage(name) {
       : (name === 'create' ? `<button class="btn btn-ghost btn-sm" onclick="showPage('dashboard')">Annuler</button>` : '');
   }
   if (name === 'account') initAccountPage();
+  if (name === 'teams') loadTeamsPage();
+  if (name === 'admin') loadAdminPage();
 
   // Sidebar actif
   document.querySelectorAll('.sidebar-item').forEach(i => i.classList.remove('active'));
@@ -2313,6 +2359,161 @@ async function confirmDeleteAccount() {
   }
 }
 
+
+// ─────────────────────────────────────────
+// ADMIN
+// ─────────────────────────────────────────
+let isAdmin = false;
+
+async function checkAdmin() {
+  const data = await sbFetch(`profiles?id=eq.${currentUser.id}&select=is_admin`).catch(() => []);
+  isAdmin = data?.[0]?.is_admin === true;
+  const link = document.getElementById('sidebar-admin-link');
+  if (link) link.classList.toggle('hidden', !isAdmin);
+}
+
+function showAdminTab(tab) {
+  ['users','spaces','teams-admin'].forEach(t => {
+    document.getElementById(`admin-tab-${t}`).style.display = t === tab ? 'block' : 'none';
+    document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tab);
+  });
+}
+
+async function loadAdminPage() {
+  if (!isAdmin) { showPage('dashboard'); return; }
+
+  // Stats
+  const [users, spaces, teams, articles] = await Promise.all([
+    sbFetch('profiles?select=id').catch(() => []),
+    sbFetch('watchlists?select=id').catch(() => []),
+    sbFetch('teams?select=id').catch(() => []),
+    sbFetch('articles?select=id&limit=1', ).catch(() => []),
+  ]);
+
+  // Pour les articles on fait un count
+  const artCount = await sbFetchCount('articles').catch(() => '?');
+
+  document.querySelector('#stat-users .stat-val').textContent = users.length;
+  document.querySelector('#stat-spaces .stat-val').textContent = spaces.length;
+  document.querySelector('#stat-teams .stat-val').textContent = teams.length;
+  document.querySelector('#stat-articles .stat-val').textContent = artCount;
+
+  showAdminTab('users');
+  await loadAdminUsers();
+}
+
+async function sbFetchCount(table) {
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + table + '?select=id', {
+    headers: {
+      'apikey': SUPABASE_ANON,
+      'Authorization': 'Bearer ' + (getToken() || SUPABASE_ANON),
+      'Prefer': 'count=exact',
+      'Range': '0-0',
+    }
+  });
+  const range = res.headers.get('content-range');
+  return range ? range.split('/')[1] : '?';
+}
+
+async function loadAdminUsers() {
+  const container = document.getElementById('admin-tab-users');
+  container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
+
+  const users = await sbFetch('profiles?select=id,display_name,email,is_admin,created_at&order=created_at.desc').catch(() => []);
+
+  let html = `<table class="admin-table">
+    <thead><tr>
+      <th>Utilisateur</th><th>Email</th><th>Inscription</th><th>Rôle</th><th></th>
+    </tr></thead><tbody>`;
+
+  users.forEach(u => {
+    const name = u.display_name || u.email?.split('@')[0] || '—';
+    const date = u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '—';
+    const isMe = u.id === currentUser.id;
+    html += `<tr>
+      <td><strong>${name}</strong>${isMe ? ' <span style="font-size:11px;color:var(--ink-faint)">(moi)</span>' : ''}</td>
+      <td style="color:var(--ink-faint);">${u.email || '—'}</td>
+      <td style="color:var(--ink-faint);">${date}</td>
+      <td>${u.is_admin ? '<span style="color:#f47920;font-weight:600;">Admin</span>' : 'Membre'}</td>
+      <td style="text-align:right;">
+        ${!isMe ? `<button class="btn btn-ghost btn-sm" onclick="toggleAdmin('${u.id}',${u.is_admin},'${name}')">${u.is_admin ? 'Retirer admin' : 'Rendre admin'}</button>` : ''}
+      </td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function loadAdminSpaces() {
+  const container = document.getElementById('admin-tab-spaces');
+  container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
+
+  const spaces = await sbFetch('watchlists?select=id,name,scope,created_at,owner_id,profiles(display_name,email)&order=created_at.desc').catch(() => []);
+
+  let html = `<table class="admin-table">
+    <thead><tr>
+      <th>Espace</th><th>Créateur</th><th>Type</th><th>Date</th>
+    </tr></thead><tbody>`;
+
+  spaces.forEach(w => {
+    const owner = w.profiles?.display_name || w.profiles?.email?.split('@')[0] || '—';
+    const date = w.created_at ? new Date(w.created_at).toLocaleDateString('fr-FR') : '—';
+    html += `<tr>
+      <td><strong>${w.name}</strong></td>
+      <td style="color:var(--ink-faint);">${owner}</td>
+      <td><span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${w.scope==='team'?'#fff3e8;color:#f47920':'#e8f0fb;color:#1b3a6b'};">${w.scope==='team'?'Équipe':'Personnel'}</span></td>
+      <td style="color:var(--ink-faint);">${date}</td>
+    </tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function loadAdminTeams() {
+  const container = document.getElementById('admin-tab-teams-admin');
+  container.innerHTML = '<p style="color:var(--ink-faint);font-size:12px;">Chargement…</p>';
+
+  const teams = await sbFetch('teams?select=id,name,created_at,profiles(display_name,email)&order=created_at.desc').catch(() => []);
+
+  let html = `<table class="admin-table">
+    <thead><tr>
+      <th>Équipe</th><th>Créateur</th><th>Membres</th><th>Date</th>
+    </tr></thead><tbody>`;
+
+  for (const t of teams) {
+    const creator = t.profiles?.display_name || t.profiles?.email?.split('@')[0] || '—';
+    const date = t.created_at ? new Date(t.created_at).toLocaleDateString('fr-FR') : '—';
+    const members = await sbFetch(`team_members?team_id=eq.${t.id}&select=id`).catch(() => []);
+    html += `<tr>
+      <td><strong>${t.name}</strong></td>
+      <td style="color:var(--ink-faint);">${creator}</td>
+      <td>${members.length} membre${members.length > 1 ? 's' : ''}</td>
+      <td style="color:var(--ink-faint);">${date}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+}
+
+async function toggleAdmin(userId, currentlyAdmin, name) {
+  if (!confirm(`${currentlyAdmin ? 'Retirer les droits admin de' : 'Donner les droits admin à'} ${name} ?`)) return;
+  const { error } = await sb.from('profiles').update({ is_admin: !currentlyAdmin }).eq('id', userId);
+  if (error) { toast(error.message, true); return; }
+  toast(`${name} ${currentlyAdmin ? 'n'est plus admin' : 'est maintenant admin'} ✓`);
+  await loadAdminUsers();
+}
+
+// Charger le bon onglet au clic
+const _origShowAdminTab = showAdminTab;
+function showAdminTab(tab) {
+  _origShowAdminTab(tab);
+  if (tab === 'spaces') loadAdminSpaces();
+  if (tab === 'teams-admin') loadAdminTeams();
+}
+
 // ─────────────────────────────────────────
 // BOOTSTRAP — point d'entrée
 // ─────────────────────────────────────────
@@ -2345,6 +2546,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     appEl.classList.add('visible');
     initUserUI(currentUser);
     await loadAll();
+    await checkAdmin();
     if (isFirstLoad) {
       showPage('dashboard');
       loader.style.opacity = '0';
