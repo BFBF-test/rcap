@@ -2423,7 +2423,9 @@ async function duplicateToPersonal() {
 
 async function leaveTeamSpace() {
   const w = currentWatchlist;
-  if (!confirm(`Quitter l'équipe associée à "${w.name}" ? Vous n'aurez plus accès à cet espace.`)) return;
+  const team = userTeams.find(t => t.id === w.team_id);
+  const teamName = team?.name || "cette équipe";
+  if (!confirm(`Quitter l'équipe "${teamName}" ? Vous perdrez l'accès à tous ses espaces partagés.`)) return;
   try {
     await sbFetch(`team_members?team_id=eq.${w.team_id}&user_id=eq.${currentUser.id}`, {
       method: 'DELETE'
