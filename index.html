@@ -1287,7 +1287,11 @@ function toggleExportMenu(e) {
   if (menu.style.display === 'block') { menu.style.display = 'none'; return; }
   const btn = document.getElementById('export-btn');
   const rect = btn.getBoundingClientRect();
-  menu.style.cssText = `display:block;position:fixed;top:${rect.bottom+4}px;right:${window.innerWidth - rect.right}px;background:white;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:160px;z-index:9999;`;
+  const menuHeight = 280;
+  const top = rect.bottom + menuHeight > window.innerHeight
+    ? rect.top - menuHeight
+    : rect.bottom + 4;
+  menu.style.cssText = `display:block;position:fixed;top:${top}px;right:${window.innerWidth - rect.right}px;background:white;border:1.5px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:160px;z-index:9999;`;
   setTimeout(() => {
     document.addEventListener('click', function handler() {
       menu.style.display = 'none';
