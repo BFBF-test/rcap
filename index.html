@@ -747,6 +747,16 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
             <button class="btn btn-primary" onclick="savePassword()">Changer le mot de passe</button>
           </div>
         </div>
+
+        <div class="form-section" style="border:1.5px solid #fee2e2;background:#fff8f8;">
+          <div class="form-section-title" style="color:var(--danger);">Supprimer mon compte</div>
+          <p style="font-size:13px;color:var(--ink-faint);margin-bottom:16px;">
+            Cette action est irréversible. Tous vos espaces personnels, flux et articles associés seront définitivement supprimés. Les espaces d'équipe que vous avez créés seront également supprimés.
+          </p>
+          <div style="display:flex;justify-content:flex-end;">
+            <button class="btn btn-danger" onclick="openDeleteAccountModal()">Supprimer mon compte</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -2142,6 +2152,41 @@ async function leaveTeamSpace() {
   }
 }
 
+
+async function openDeleteAccountModal() {
+  document.getElementById('delete-account-confirm').value = '';
+  document.getElementById('modal-delete-account').classList.remove('hidden');
+}
+
+async function confirmDeleteAccount() {
+  const input = document.getElementById('delete-account-confirm').value.trim().toLowerCase();
+  if (input !== currentUser.email.toLowerCase()) {
+    toast("L'email ne correspond pas", true);
+    return;
+  }
+
+  try {
+    // Supprimer les données dans l'ordre
+    await sbFetch(`articles?watchlist_id=in.(${
+      (await sbFetch(`watchlists?owner_id=eq.${currentUser.id}&select=id`)).map(w=>w.id).join(',') || 'null'
+    })`, { method: 'DELETE' }).catch(() => {});
+    await sbFetch(`feeds?watchlist_id=in.(${
+      (await sbFetch(`watchlists?owner_id=eq.${currentUser.id}&select=id`)).map(w=>w.id).join(',') || 'null'
+    })`, { method: 'DELETE' }).catch(() => {});
+    await sbFetch(`watchlists?owner_id=eq.${currentUser.id}`, { method: 'DELETE' }).catch(() => {});
+    await sbFetch(`team_members?user_id=eq.${currentUser.id}`, { method: 'DELETE' }).catch(() => {});
+
+    // Supprimer le compte via Supabase Auth
+    const { error } = await sb.rpc('delete_user');
+    if (error) throw error;
+
+    await sb.auth.signOut();
+    location.reload();
+  } catch(e) {
+    toast(e.message, true);
+  }
+}
+
 // ─────────────────────────────────────────
 // BOOTSTRAP — point d'entrée
 // ─────────────────────────────────────────
@@ -2291,6 +2336,23 @@ sb.auth.onAuthStateChange(async (event, session) => {
   </div>
 </div>
 
+
+
+<!-- ════════════════════════════════════════
+     MODAL : SUPPRIMER LE COMPTE
+════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-delete-account">
+  <div class="modal" style="width:440px;">
+    <div class="modal-title" style="color:var(--danger);">Supprimer mon compte</div>
+    <div class="modal-desc">Pour confirmer, tapez votre email ci-dessous :</div>
+    <input id="delete-account-confirm" type="email" placeholder="votre@email.fr"
+      style="width:100%;padding:9px 12px;border:1.5px solid var(--danger);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;margin-bottom:8px;box-sizing:border-box;">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('delete-account')">Annuler</button>
+      <button class="btn btn-danger" onclick="confirmDeleteAccount()">Supprimer définitivement</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
