@@ -923,6 +923,26 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
         <div class="admin-table-wrap" id="admin-tab-spaces" style="display:none;"></div>
         <div class="admin-table-wrap" id="admin-tab-teams-admin" style="display:none;"></div>
 
+        <!-- Maintenance -->
+        <div class="form-section" style="margin-top:32px;border-top:1px solid var(--border);padding-top:24px;">
+          <div class="form-section-title">Maintenance</div>
+          <p style="font-size:13px;color:var(--ink-light);margin:8px 0 16px;">Supprimer les anciens articles pour alléger la base de données.</p>
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <label style="font-size:13px;color:var(--ink);">Supprimer les articles de plus de</label>
+            <select id="cleanup-period" style="padding:6px 10px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;background:var(--white);">
+              <option value="3">3 mois</option>
+              <option value="6" selected>6 mois</option>
+              <option value="9">9 mois</option>
+              <option value="12">1 an</option>
+              <option value="18">18 mois</option>
+              <option value="24">2 ans</option>
+            </select>
+            <button class="btn btn-ghost btn-sm" onclick="previewCleanup()">Estimer</button>
+            <button class="btn btn-sm" id="cleanup-confirm-btn" style="display:none;background:#e53e3e;color:white;border-color:#e53e3e;" onclick="runCleanup()">Confirmer la suppression</button>
+          </div>
+          <div id="cleanup-preview" style="margin-top:12px;font-size:13px;color:var(--ink-light);"></div>
+        </div>
+
       </div>
     </div>
 
@@ -3192,6 +3212,55 @@ async function adminRemoveFromTeam(teamId, userId, name) {
   await sb.from('team_members').delete().eq('team_id', teamId).eq('user_id', userId);
   toast(`${name} retiré ✓`);
   loadAdminTeams();
+}
+
+async function previewCleanup() {
+  const months = parseInt(document.getElementById('cleanup-period').value);
+  const preview = document.getElementById('cleanup-preview');
+  const btn = document.getElementById('cleanup-confirm-btn');
+  preview.textContent = 'Calcul en cours…';
+  btn.style.display = 'none';
+
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+
+  const data = await sbFetch(
+    `articles?select=id&published_at=lt.${cutoff.toISOString()}&limit=10000`
+  ).catch(() => null);
+
+  if (!data) { preview.textContent = 'Erreur lors du calcul.'; return; }
+
+  const count = data.length;
+  if (count === 0) {
+    preview.innerHTML = '✅ Aucun article à supprimer pour cette période.';
+    btn.style.display = 'none';
+  } else {
+    preview.innerHTML = `<strong style="color:#e53e3e;">${count} article${count>1?'s':''}</strong> seront supprimés (publiés avant le ${cutoff.toLocaleDateString('fr-FR')}).`;
+    btn.style.display = '';
+  }
+}
+
+async function runCleanup() {
+  const months = parseInt(document.getElementById('cleanup-period').value);
+  const preview = document.getElementById('cleanup-preview');
+  const btn = document.getElementById('cleanup-confirm-btn');
+  btn.style.display = 'none';
+  preview.textContent = 'Suppression en cours…';
+
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+
+  const res = await sbFetch(
+    `articles?published_at=lt.${cutoff.toISOString()}`,
+    { method: 'DELETE' }
+  ).catch(() => null);
+
+  if (res === null) {
+    preview.textContent = 'Erreur lors de la suppression.';
+    return;
+  }
+  preview.innerHTML = '✅ Nettoyage effectué. Actualisez pour voir les nouvelles stats.';
+  loadAdminPage();
 }
 
 async function toggleAdmin(userId, currentlyAdmin, name) {
