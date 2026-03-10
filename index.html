@@ -811,19 +811,20 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
         <div class="filter-chip" onclick="filterPeriod(this, 30)">30 jours</div>
         <div class="filter-chip" onclick="filterPeriod(this, 90)">3 mois</div>
         <div class="filter-chip" onclick="filterPeriod(this, 0)">Tout</div>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:6px;flex-shrink:0;padding-left:12px;">
-          <span class="filter-label">Tri :</span>
-          <div class="filter-chip active" id="sort-date" onclick="setSort('date', this)">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M2 8l4 3 4-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Date
-          </div>
-          <div class="filter-chip" id="sort-source" onclick="setSort('source', this)">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h7M1 9h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-            Source
-          </div>
-        </div>
+
       </div>
 
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 28px;background:var(--white);border-bottom:1px solid var(--border-soft);">
+        <span class="filter-label">Tri :</span>
+        <div class="filter-chip active" id="sort-date" onclick="setSort('date')" style="font-size:11px;padding:3px 9px;">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M2 8l4 3 4-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Date
+        </div>
+        <div class="filter-chip" id="sort-source" onclick="setSort('source')" style="font-size:11px;padding:3px 9px;">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M1 3h10M1 6h7M1 9h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+          Source
+        </div>
+      </div>
       <div id="kw-filter-info" style="display:none;font-size:12px;color:var(--ink-faint);padding:4px 28px;background:var(--navy-soft);border-bottom:1px solid var(--border);"></div>
       <div class="articles-list" id="articles-list" style="flex:1;overflow-y:auto;"></div>
 
