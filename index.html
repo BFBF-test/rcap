@@ -683,6 +683,9 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
         </div>
       </div>
 
+      <!-- Bannières nouvelles équipes -->
+      <div id="banners-new-teams"></div>
+
       <div class="section-label perso">Mes espaces personnels</div>
       <div class="cards-grid" id="grid-personal">
         <div class="watchlist-card card-new" onclick="showCreate()">
@@ -1129,6 +1132,32 @@ async function loadTeams() {
     `team_members?select=team_id,role,teams(id,name)&user_id=eq.${currentUser.id}`
   ).catch(() => []);
   userTeams = (data || []).map(r => ({ ...r.teams, role: r.role }));
+
+  // Détecter les nouvelles équipes depuis la dernière visite
+  const storageKey = `rcap-known-teams-${currentUser.id}`;
+  let knownIds = [];
+  try { knownIds = JSON.parse(localStorage.getItem(storageKey) || '[]'); } catch (_) {}
+
+  const currentIds = userTeams.map(t => t.id);
+  const newTeams = userTeams.filter(t => !knownIds.includes(t.id));
+
+  // Mémoriser les équipes actuelles
+  localStorage.setItem(storageKey, JSON.stringify(currentIds));
+
+  // Afficher une bannière par nouvelle équipe (sauf au tout premier chargement)
+  const container = document.getElementById('banners-new-teams');
+  if (container && knownIds.length > 0 && newTeams.length > 0) {
+    newTeams.forEach(team => {
+      const banner = document.createElement('div');
+      banner.style.cssText = 'display:flex;align-items:center;justify-content:space-between;background:#e8f0fb;border:1.5px solid #1b3a6b;border-radius:var(--radius);padding:12px 16px;margin-bottom:12px;gap:12px;';
+      banner.innerHTML = `
+        <span style="font-size:13px;color:#1b3a6b;">
+          👥 Vous avez été ajouté à l'équipe <strong>${team.name}</strong>.
+        </span>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0;" onclick="this.closest('div').remove()">OK</button>`;
+      container.appendChild(banner);
+    });
+  }
 }
 
 async function loadDashboard() {
