@@ -697,8 +697,32 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 // INIT SUPABASE
 // ─────────────────────────────────────────
 const { createClient } = supabase;
-// Lock no-op : désactive le mécanisme de verrou qui bloque sur les pages statiques
-const noLock = (name, acquireTimeout, fn) => fn();
+// Helper : récupère le token depuis localStorage
+function getToken() {
+  try {
+    const s = localStorage.getItem('rcap-auth');
+    return s ? JSON.parse(s).access_token : null;
+  } catch { return null; }
+}
+
+// Helper : appel API Supabase avec fetch natif (contourne les problèmes de lock)
+async function sbFetch(path, options = {}) {
+  const token = getToken();
+  const headers = {
+    'apikey': SUPABASE_ANON,
+    'Authorization': token ? 'Bearer ' + token : 'Bearer ' + SUPABASE_ANON,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...( options.headers || {})
+  };
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, { ...options, headers });
+  if (!res.ok && res.status !== 404) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || err.hint || `HTTP ${res.status}`);
+  }
+  if (res.status === 204) return [];
+  return res.json().catch(() => []);
+}
 
 const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
@@ -708,7 +732,6 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
     detectSessionInUrl: true,
     persistSession: true,
     autoRefreshToken: true,
-    lock: noLock,
   }
 });
 
@@ -831,30 +854,31 @@ async function loadAll() {
 }
 
 async function loadTeams() {
-  const { data } = await sb
-    .from('team_members')
-    .select('team_id, role, teams(id, name)')
-    .eq('user_id', currentUser.id);
-
+  const data = await sbFetch(
+    `team_members?select=team_id,role,teams(id,name)&user_id=eq.${currentUser.id}`
+  ).catch(() => []);
   userTeams = (data || []).map(r => ({ ...r.teams, role: r.role }));
 }
 
 async function loadDashboard() {
-  const { data: watchlists } = await sb
-    .from('watchlists')
-    .select('*, feeds(id, label, url)')
-    .order('created_at', { ascending: false });
+  const watchlists = await sbFetch(
+    'watchlists?select=*,feeds(id,label,url)&order=created_at.desc'
+  ).catch(() => []);
 
-  if (!watchlists) return;
+  if (!watchlists || !watchlists.length) {
+    renderPersonalGrid([], {});
+    renderTeamGroups({}, {});
+    renderSidebar([], {});
+    return;
+  }
 
   // Compter les articles récents par watchlist
   const counts = {};
   const since = new Date();
   since.setDate(since.getDate() - 7);
-  const { data: recent } = await sb
-    .from('articles')
-    .select('watchlist_id')
-    .gte('published_at', since.toISOString());
+  const recent = await sbFetch(
+    `articles?select=watchlist_id&published_at=gte.${since.toISOString()}`
+  ).catch(() => []);
 
   (recent || []).forEach(a => {
     counts[a.watchlist_id] = (counts[a.watchlist_id] || 0) + 1;
@@ -1005,8 +1029,7 @@ async function openWatchlist(w) {
 
 async function buildSourceFilters(w) {
   const bar = document.getElementById('filter-bar');
-  // Garder les éléments fixes (période), reconstruire les sources
-  const { data: feeds } = await sb.from('feeds').select('id,label,url').eq('watchlist_id', w.id);
+  const feeds = await sbFetch(`feeds?select=id,label,url&watchlist_id=eq.${w.id}`).catch(() => []);
   srcColors = {};
   (feeds || []).forEach((f, i) => { srcColors[f.id] = COLORS[i % COLORS.length]; });
 
@@ -1031,22 +1054,16 @@ async function fetchArticles() {
   const list = document.getElementById('articles-list');
   list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink-faint);">Chargement…</div>';
 
-  let query = sb.from('articles')
-    .select('*, feeds(id,label,url)')
-    .eq('watchlist_id', currentWatchlist.id)
-    .order('published_at', { ascending: false })
-    .limit(200);
-
-  if (activeFeedFilter)  query = query.eq('feed_id', activeFeedFilter);
+  let qs = `articles?select=*,feeds(id,label,url)&watchlist_id=eq.${currentWatchlist.id}&order=published_at.desc&limit=200`;
+  if (activeFeedFilter) qs += `&feed_id=eq.${activeFeedFilter}`;
   if (activePeriod > 0) {
     const since = new Date();
     since.setDate(since.getDate() - activePeriod);
-    query = query.gte('published_at', since.toISOString());
+    qs += `&published_at=gte.${since.toISOString()}`;
   }
-
-  const { data, error } = await query;
-  if (error) { toast('Erreur chargement articles', true); return; }
-  allArticles = data || [];
+  const data = await sbFetch(qs).catch(() => null);
+  if (!data) { toast('Erreur chargement articles', true); return; }
+  allArticles = data;
   renderArticles(allArticles);
 }
 
@@ -1296,16 +1313,19 @@ async function createWatchlist() {
 
   try {
     // 1. Créer la watchlist
-    const { data: wl, error: wlErr } = await sb.from('watchlists').insert({
-      name,
-      description: document.getElementById('create-desc').value.trim() || null,
-      owner_id: currentUser.id,
-      scope: currentScope,
-      team_id: currentScope === 'team' ? selectedTeamId : null,
-      frequency: document.getElementById('create-frequency').value,
-    }).select().single();
-
-    if (wlErr) throw wlErr;
+    const wlArr = await sbFetch('watchlists', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        description: document.getElementById('create-desc').value.trim() || null,
+        owner_id: currentUser.id,
+        scope: currentScope,
+        team_id: currentScope === 'team' ? selectedTeamId : null,
+        frequency: document.getElementById('create-frequency').value,
+      })
+    });
+    const wl = Array.isArray(wlArr) ? wlArr[0] : wlArr;
+    if (!wl?.id) throw new Error('Erreur création watchlist');
 
     // 2. Créer les feeds
     const feedsToInsert = feedsData.map(f => ({
@@ -1314,8 +1334,7 @@ async function createWatchlist() {
       label: f.label,
       keywords: f.keywords,
     }));
-    const { error: feedErr } = await sb.from('feeds').insert(feedsToInsert);
-    if (feedErr) throw feedErr;
+    await sbFetch('feeds', { method: 'POST', body: JSON.stringify(feedsToInsert) });
 
     toast(`Espace "${name}" créé avec succès ✓`);
     await loadAll();
@@ -1372,11 +1391,16 @@ async function createTeamFromPage() {
 }
 
 async function _createTeam(name) {
-  const { data: team, error } = await sb.from('teams')
-    .insert({ name, created_by: currentUser.id }).select().single();
-  if (error) { toast(error.message, true); return; }
-  // S'ajouter comme admin
-  await sb.from('team_members').insert({ team_id: team.id, user_id: currentUser.id, role: 'admin' });
+  const arr = await sbFetch('teams', {
+    method: 'POST',
+    body: JSON.stringify({ name, created_by: currentUser.id })
+  }).catch(e => { toast(e.message, true); return null; });
+  if (!arr) return;
+  const team = Array.isArray(arr) ? arr[0] : arr;
+  await sbFetch('team_members', {
+    method: 'POST',
+    body: JSON.stringify({ team_id: team.id, user_id: currentUser.id, role: 'admin' })
+  });
   userTeams.push({ ...team, role: 'admin' });
   toast(`Équipe "${name}" créée ✓`);
 }
