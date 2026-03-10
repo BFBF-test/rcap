@@ -1824,9 +1824,11 @@ function addKeyword(e, n) {
 }
 
 function getKeywords(n) {
-  return Array.from(document.querySelectorAll(`#kw-box-${n} .kw-tag`))
-    .map(t => t.childNodes[0].textContent.trim())
-    .filter(Boolean);
+  const tags = Array.from(document.querySelectorAll(`#kw-box-${n} .kw-tag`))
+    .map(t => t.childNodes[0].textContent.trim()).filter(Boolean);
+  const input = document.getElementById(`kw-input-${n}`);
+  if (input && input.value.trim()) tags.push(input.value.trim());
+  return tags;
 }
 
 async function createWatchlist() {
@@ -2299,8 +2301,11 @@ function addEditKeyword(e, n) {
 }
 
 function getEditKeywords(n) {
-  return Array.from(document.querySelectorAll(`#efk-${n} .kw-tag`))
+  const tags = Array.from(document.querySelectorAll(`#efk-${n} .kw-tag`))
     .map(t => t.childNodes[0].textContent.trim()).filter(Boolean);
+  const input = document.querySelector(`#efk-${n} .kw-input`);
+  if (input && input.value.trim()) tags.push(input.value.trim());
+  return tags;
 }
 
 async function confirmEdit() {
