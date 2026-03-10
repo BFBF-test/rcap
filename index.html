@@ -1398,7 +1398,11 @@ function exportOPML() {
   Object.entries(sources).forEach(([url, label]) => {
     xml += `    <outline type="rss" text="${label}" title="${label}" xmlUrl="${url}"/>\n`;
   });
-  xml += `  </body>\n</opml>`;
+  xml += `  
+
+
+
+</body>\n</opml>`;
   download(`rcap-sources-${Date.now()}.opml`, xml, 'text/xml');
   toast(`${Object.keys(sources).length} source(s) exportée(s) en OPML`);
   document.getElementById('export-menu').style.display = 'none';
@@ -2632,6 +2636,23 @@ async function toggleAdmin(userId, currentlyAdmin, name) {
   loadAdminUsers();
 }
 
+
+function showSetPasswordModal() {
+  document.getElementById('modal-set-password').classList.remove('hidden');
+}
+
+async function saveFirstPassword() {
+  const pw1 = document.getElementById('first-pw1').value;
+  const pw2 = document.getElementById('first-pw2').value;
+  if (!pw1) { toast("Entrez un mot de passe", true); return; }
+  if (pw1.length < 6) { toast("Minimum 6 caractères", true); return; }
+  if (pw1 !== pw2) { toast("Les mots de passe ne correspondent pas", true); return; }
+  const { error } = await sb.auth.updateUser({ password: pw1 });
+  if (error) { toast(error.message, true); return; }
+  document.getElementById('modal-set-password').classList.add('hidden');
+  toast("Mot de passe défini ✓ Bienvenue !");
+  showPage('dashboard');
+}
 // ─────────────────────────────────────────
 // BOOTSTRAP — point d'entrée
 // ─────────────────────────────────────────
@@ -2666,9 +2687,15 @@ sb.auth.onAuthStateChange(async (event, session) => {
     await loadAll();
     await checkAdmin();
     if (isFirstLoad) {
-      showPage('dashboard');
       loader.style.opacity = '0';
       setTimeout(() => loader.style.display = 'none', 400);
+      // Arrivée via lien magique (URL contient #access_token) -> definir un mot de passe
+      if (event === 'SIGNED_IN' && window.location.hash.includes('access_token')) {
+        window.location.hash = '';
+        showSetPasswordModal();
+      } else {
+        showPage('dashboard');
+      }
     }
   } else {
     currentUser = null;
@@ -2800,5 +2827,30 @@ sb.auth.onAuthStateChange(async (event, session) => {
   </div>
 </div>
 
+
+
+
+
+
+<!-- ════════════════════════════════════════
+     MODAL : DÉFINIR MOT DE PASSE (1ère connexion)
+════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-set-password">
+  <div class="modal" style="width:420px;">
+    <div class="modal-title">Bienvenue sur RCap !</div>
+    <div class="modal-desc" style="margin-bottom:20px;">Pour sécuriser votre compte, définissez un mot de passe. Vous en aurez besoin pour vous reconnecter.</div>
+    <div class="form-group">
+      <label>Mot de passe</label>
+      <input id="first-pw1" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" onkeydown="if(event.key==='Enter') document.getElementById('first-pw2').focus()">
+    </div>
+    <div class="form-group" style="margin-bottom:0;">
+      <label>Confirmer le mot de passe</label>
+      <input id="first-pw2" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" onkeydown="if(event.key==='Enter') saveFirstPassword()">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveFirstPassword()">Définir mon mot de passe</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
