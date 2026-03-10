@@ -148,10 +148,10 @@ async function main() {
   console.log(`${allFeeds.length} flux total, ${feeds.length} a traiter ce creneau`);
   if (feeds.length === 0) { console.log('Aucun flux a traiter pour ce creneau.'); return; }
 
-  // 2. Recuperer les URLs deja en base
-  const existing = await sb('articles?select=url');
-  const existingUrls = new Set(existing.map(a => a.url));
-  console.log(`${existingUrls.size} articles deja en base`);
+  // 2. Recuperer les paires (watchlist_id, url) deja en base
+  const existing = await sb('articles?select=watchlist_id,url');
+  const existingKeys = new Set(existing.map(a => `${a.watchlist_id}|${a.url}`));
+  console.log(`${existingKeys.size} articles deja en base`);
 
   let totalNew = 0;
   let totalErrors = 0;
@@ -170,7 +170,7 @@ async function main() {
     };
 
     const newItems = items
-      .filter(item => item.url && !existingUrls.has(item.url) && matchesKeywords(item))
+      .filter(item => item.url && !existingKeys.has(`${feed.watchlist_id}|${item.url}`) && matchesKeywords(item))
       .map(item => ({
         watchlist_id: feed.watchlist_id,
         feed_id:      feed.id,
@@ -180,7 +180,7 @@ async function main() {
         published_at: item.published_at,
       }));
 
-    const skipped = items.filter(i => i.url && !existingUrls.has(i.url) && !matchesKeywords(i)).length;
+    const skipped = items.filter(i => i.url && !existingKeys.has(`${feed.watchlist_id}|${i.url}`) && !matchesKeywords(i)).length;
     if (newItems.length === 0 && skipped === 0) { console.log('0 nouveau'); continue; }
     if (newItems.length === 0 && skipped > 0) { console.log(`0 nouveau (${skipped} hors mots-cles)`); continue; }
 
@@ -200,7 +200,7 @@ async function main() {
           },
           body: JSON.stringify(batch),
         });
-        batch.forEach(a => existingUrls.add(a.url));
+        batch.forEach(a => existingKeys.add(`${a.watchlist_id}|${a.url}`));
       } catch (err) {
         batchErrors++;
         console.warn(`\n    [ERREUR batch] ${err.message}`);
