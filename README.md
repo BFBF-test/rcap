@@ -92,6 +92,9 @@ Tableau de bord
 - Gestion des utilisateurs (droits admin, suppression)
 - Maintenance : nettoyage des anciens articles par période, avec estimation du nombre d'articles concernés avant confirmation
 
+
+Compte de démonstration, utilisateur ou administrateur, sur demande.
+
 ---
 
 ## Architecture
