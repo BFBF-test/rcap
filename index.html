@@ -780,9 +780,9 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
           <div class="form-group" style="margin:0">
             <label>Fréquence</label>
             <select id="create-frequency">
-              <option value="3x_day">3 fois par jour — 8h, 14h, 20h (recommandé)</option>
-              <option value="2x_day">2 fois par jour — 8h et 18h</option>
-              <option value="1x_day">1 fois par jour — 8h</option>
+              <option value="haute">Haute — 3x/jour (8h, 14h, 20h)</option>
+              <option value="normale" selected>Normale — 1x/jour à 8h (recommandé)</option>
+              <option value="basse">Basse — 1x/semaine le lundi</option>
             </select>
           </div>
         </div>
@@ -2035,7 +2035,7 @@ function download(filename, content, type) {
 function initCreateForm() {
   document.getElementById('create-name').value = '';
   document.getElementById('create-desc').value = '';
-  document.getElementById('create-frequency').value = '3x_day';
+  document.getElementById('create-frequency').value = 'normale';
   document.getElementById('feeds-container').innerHTML = '';
   feedCount = 0;
   currentScope = 'personal';
@@ -2529,6 +2529,7 @@ async function openEditModal() {
   watchlistToEdit = currentWatchlist;
   document.getElementById('edit-name').value = watchlistToEdit.name || '';
   document.getElementById('edit-desc').value = watchlistToEdit.description || '';
+  document.getElementById('edit-frequency').value = watchlistToEdit.frequency || 'normale';
 
   // Initialiser la portée
   editScope = watchlistToEdit.scope || 'personal';
@@ -2624,6 +2625,7 @@ async function confirmEdit() {
       toast("Sélectionnez une équipe", true); return;
     }
     // Mettre à jour la watchlist
+    const editFreq = document.getElementById('edit-frequency')?.value || 'normale';
     await sbFetch(`watchlists?id=eq.${watchlistToEdit.id}`, {
       method: 'PATCH',
       body: JSON.stringify({
@@ -2631,6 +2633,7 @@ async function confirmEdit() {
         description: document.getElementById('edit-desc').value.trim() || null,
         scope: editScope,
         team_id: editScope === 'team' ? editSelectedTeamId : null,
+        frequency: editFreq,
       })
     });
 
@@ -3412,6 +3415,15 @@ sb.auth.onAuthStateChange(async (event, session) => {
         <label style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-light);font-weight:500;">Choisir une équipe</label>
         <div class="team-chips" id="edit-team-chips"></div>
       </div>
+    </div>
+
+    <div class="form-group">
+      <label>Fréquence de scan</label>
+      <select id="edit-frequency">
+        <option value="haute">Haute — 3x/jour (8h, 14h, 20h)</option>
+        <option value="normale">Normale — 1x/jour à 8h</option>
+        <option value="basse">Basse — 1x/semaine le lundi</option>
+      </select>
     </div>
 
     <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:var(--ink-light);font-weight:500;margin-bottom:10px;">Flux RSS</div>
