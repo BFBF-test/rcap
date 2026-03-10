@@ -800,10 +800,13 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
         </div>
 
         <!-- Onglets -->
-        <div style="display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0;">
-          <button class="admin-tab active" id="tab-users" onclick="showAdminTab('users')">Utilisateurs</button>
-          <button class="admin-tab" id="tab-spaces" onclick="showAdminTab('spaces')">Espaces</button>
-          <button class="admin-tab" id="tab-teams-admin" onclick="showAdminTab('teams-admin')">Équipes</button>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0;">
+          <div style="display:flex;gap:4px;">
+            <button class="admin-tab active" id="tab-users" onclick="showAdminTab('users')">Utilisateurs</button>
+            <button class="admin-tab" id="tab-spaces" onclick="showAdminTab('spaces')">Espaces</button>
+            <button class="admin-tab" id="tab-teams-admin" onclick="showAdminTab('teams-admin')">Équipes</button>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="margin-bottom:4px;" onclick="adminRefresh()" title="Rafraîchir">↻ Actualiser</button>
         </div>
 
         <!-- Contenu onglets -->
@@ -2386,6 +2389,15 @@ function showAdminTab(tab) {
   if (tab === 'teams-admin') loadAdminTeams();
 }
 
+function adminRefresh() {
+  const active = ['users','spaces','teams-admin'].find(t =>
+    document.getElementById(`tab-${t}`)?.classList.contains('active')
+  );
+  if (active === 'users') loadAdminUsers();
+  else if (active === 'spaces') loadAdminSpaces();
+  else if (active === 'teams-admin') loadAdminTeams();
+}
+
 async function loadAdminPage() {
   if (!isAdmin) { showPage('dashboard'); return; }
 
@@ -2481,8 +2493,8 @@ async function adminCreateUser() {
 }
 
 async function adminDeleteUser(userId, name) {
-  if (!confirm(`Supprimer définitivement le compte de ${name} ?`)) return;
-  // Supprimer les données
+  if (!confirm(`Supprimer définitivement le compte de ${name} ? Cette action est irréversible.`)) return;
+  // 1. Supprimer les données liées
   const wls = await sbFetch(`watchlists?owner_id=eq.${userId}&select=id`).catch(() => []);
   const ids = wls.map(w => w.id);
   if (ids.length) {
@@ -2491,7 +2503,11 @@ async function adminDeleteUser(userId, name) {
     await sbFetch(`watchlists?owner_id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
   }
   await sbFetch(`team_members?user_id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
+  // 2. Supprimer le profil
   await sbFetch(`profiles?id=eq.${userId}`, { method: 'DELETE' }).catch(() => {});
+  // 3. Supprimer le compte auth via la fonction SQL sécurisée
+  const { error } = await sb.rpc('admin_delete_user', { target_user_id: userId });
+  if (error) { toast(`Données supprimées mais erreur auth : ${error.message}`, true); return; }
   toast(`Compte de ${name} supprimé ✓`);
   loadAdminUsers();
 }
