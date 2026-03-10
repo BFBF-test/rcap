@@ -2377,6 +2377,9 @@ function showAdminTab(tab) {
     document.getElementById(`admin-tab-${t}`).style.display = t === tab ? 'block' : 'none';
     document.getElementById(`tab-${t}`)?.classList.toggle('active', t === tab);
   });
+  if (tab === 'users') loadAdminUsers();
+  if (tab === 'spaces') loadAdminSpaces();
+  if (tab === 'teams-admin') loadAdminTeams();
 }
 
 async function loadAdminPage() {
@@ -2504,14 +2507,6 @@ async function toggleAdmin(userId, currentlyAdmin, name) {
   if (error) { toast(error.message, true); return; }
   toast(`${name} ${currentlyAdmin ? "n'est plus admin" : "est maintenant admin"} ✓`);
   await loadAdminUsers();
-}
-
-// Charger le bon onglet au clic
-const _origShowAdminTab = showAdminTab;
-function showAdminTab(tab) {
-  _origShowAdminTab(tab);
-  if (tab === 'spaces') loadAdminSpaces();
-  if (tab === 'teams-admin') loadAdminTeams();
 }
 
 // ─────────────────────────────────────────
