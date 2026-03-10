@@ -1321,16 +1321,18 @@ function selectScope(scope) {
 function renderTeamChips() {
   const container = document.getElementById('team-chips-list');
   container.innerHTML = '';
-  userTeams.forEach(t => {
-    const chip = document.createElement('div');
-    chip.className = 'team-chip' + (t.id === selectedTeamId ? ' selected' : '');
-    chip.textContent = t.name;
-    chip.onclick = () => {
-      selectedTeamId = t.id;
-      renderTeamChips();
-    };
-    container.appendChild(chip);
-  });
+
+  if (userTeams.length === 0) {
+    container.innerHTML = '<p style="font-size:12px;color:var(--ink-faint);margin-bottom:8px;">Vous n'avez pas encore d'équipe.</p>';
+  } else {
+    userTeams.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'team-chip' + (t.id === selectedTeamId ? ' selected' : '');
+      chip.textContent = t.name;
+      chip.onclick = () => { selectedTeamId = t.id; renderTeamChips(); };
+      container.appendChild(chip);
+    });
+  }
 }
 
 function addFeedBlock() {
@@ -1605,13 +1607,40 @@ function selectEditScope(scope) {
 function renderEditTeamChips() {
   const container = document.getElementById('edit-team-chips');
   container.innerHTML = '';
-  userTeams.forEach(t => {
-    const chip = document.createElement('div');
-    chip.className = 'team-chip' + (t.id === editSelectedTeamId ? ' selected' : '');
-    chip.textContent = t.name;
-    chip.onclick = () => { editSelectedTeamId = t.id; renderEditTeamChips(); };
-    container.appendChild(chip);
-  });
+
+  if (userTeams.length === 0) {
+    container.innerHTML = '<p style="font-size:12px;color:var(--ink-faint);margin-bottom:8px;">Vous n'avez pas encore d'équipe.</p>';
+  } else {
+    userTeams.forEach(t => {
+      const chip = document.createElement('div');
+      chip.className = 'team-chip' + (t.id === editSelectedTeamId ? ' selected' : '');
+      chip.textContent = t.name;
+      chip.onclick = () => { editSelectedTeamId = t.id; renderEditTeamChips(); };
+      container.appendChild(chip);
+    });
+  }
+
+  // Toujours afficher le champ de création
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:8px;margin-top:10px;';
+  row.innerHTML = `
+    <input id="edit-new-team-input" type="text" placeholder="Créer une nouvelle équipe…"
+      style="flex:1;padding:8px 11px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px;outline:none;"
+      onkeydown="if(event.key==='Enter') createTeamFromEdit()">
+    <button class="btn btn-ghost btn-sm" onclick="createTeamFromEdit()">Créer</button>`;
+  container.appendChild(row);
+}
+
+async function createTeamFromEdit() {
+  const input = document.getElementById('edit-new-team-input');
+  const name = input.value.trim();
+  if (!name) return;
+  await _createTeam(name);
+  input.value = '';
+  // Sélectionner automatiquement la nouvelle équipe
+  const newTeam = userTeams[userTeams.length - 1];
+  if (newTeam) editSelectedTeamId = newTeam.id;
+  renderEditTeamChips();
 }
 
 async function openEditModal() {
