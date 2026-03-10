@@ -2502,7 +2502,7 @@ async function toggleAdmin(userId, currentlyAdmin, name) {
   if (!confirm(`${currentlyAdmin ? 'Retirer les droits admin de' : 'Donner les droits admin à'} ${name} ?`)) return;
   const { error } = await sb.from('profiles').update({ is_admin: !currentlyAdmin }).eq('id', userId);
   if (error) { toast(error.message, true); return; }
-  toast(`${name} ${currentlyAdmin ? 'n'est plus admin' : 'est maintenant admin'} ✓`);
+  toast(`${name} ${currentlyAdmin ? "n'est plus admin" : "est maintenant admin"} ✓`);
   await loadAdminUsers();
 }
 
