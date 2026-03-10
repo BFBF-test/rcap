@@ -2113,5 +2113,27 @@ sb.auth.onAuthStateChange(async (event, session) => {
 </div>
 
 
+
+<!-- ════════════════════════════════════════
+     MODAL : INVITER DANS UNE ÉQUIPE
+════════════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-invite">
+  <div class="modal" style="width:480px;">
+    <button class="modal-close" onclick="closeModal('invite')">×</button>
+    <div class="modal-title" id="modal-invite-title">Inviter dans l'équipe</div>
+    <div class="modal-desc">Recherchez un collègue par nom ou email.</div>
+    <input type="hidden" id="invite-team-id">
+    <div class="search-box" style="max-width:100%;margin-bottom:12px;">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+      <input type="text" id="invite-search-input" placeholder="Nom ou email…" oninput="searchUsersToInvite()" style="width:100%;">
+    </div>
+    <div id="invite-results" style="min-height:60px;max-height:260px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('invite')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+
 </body>
 </html>
