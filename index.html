@@ -1027,6 +1027,8 @@ const sb = createClient(SUPABASE_URL, SUPABASE_ANON, {
 let currentUser      = null;
 let currentWatchlist = null;   // watchlist ouverte dans articles
 let allArticles      = [];     // articles chargés
+let articlesOffset   = 0;      // offset pagination
+let articlesHasMore  = false;  // il reste des articles
 let activeFeedFilter = null;   // null = toutes les sources
 let activePeriod     = 7;      // jours
 let selectedIds      = new Set();
@@ -1351,6 +1353,8 @@ async function openWatchlist(w) {
   activeFeedFilter = null;
   activePeriod = 7;
   allArticles = [];
+  articlesOffset = 0;
+  articlesHasMore = false;
   activeKws = new Set();
   showUnreadOnly = false;
 
@@ -1475,11 +1479,21 @@ async function buildSourceFilters(w) {
   }
 }
 
-async function fetchArticles() {
-  const list = document.getElementById('articles-list');
-  list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink-faint);">Chargement…</div>';
+const PAGE_SIZE = 200;
 
-  let qs = `articles?select=*,feeds(id,label,url)&watchlist_id=eq.${currentWatchlist.id}&order=published_at.desc&limit=200`;
+async function fetchArticles(append = false) {
+  const list = document.getElementById('articles-list');
+  if (!append) {
+    articlesOffset = 0;
+    allArticles = [];
+    list.innerHTML = '<div style="padding:40px;text-align:center;color:var(--ink-faint);">Chargement…</div>';
+  } else {
+    // Retirer le bouton "Charger plus" existant
+    const btn = document.getElementById('load-more-btn');
+    if (btn) btn.remove();
+  }
+
+  let qs = `articles?select=*,feeds(id,label,url)&watchlist_id=eq.${currentWatchlist.id}&order=published_at.desc&limit=${PAGE_SIZE}&offset=${articlesOffset}`;
   if (activeFeedFilter) qs += `&feed_id=eq.${activeFeedFilter}`;
   if (activePeriod > 0) {
     const since = new Date();
@@ -1488,8 +1502,76 @@ async function fetchArticles() {
   }
   const data = await sbFetch(qs).catch(() => null);
   if (!data) { toast('Erreur chargement articles', true); return; }
-  allArticles = data;
-  renderArticles(allArticles);
+
+  articlesHasMore = data.length === PAGE_SIZE;
+  articlesOffset += data.length;
+
+  if (append) {
+    allArticles = [...allArticles, ...data];
+    // Ajouter seulement les nouveaux articles au DOM
+    renderArticlesAppend(data);
+  } else {
+    allArticles = data;
+    renderArticles(allArticles);
+  }
+
+  // Bouton "Charger plus"
+  updateLoadMoreBtn();
+}
+
+function updateLoadMoreBtn() {
+  const existing = document.getElementById('load-more-btn');
+  if (existing) existing.remove();
+  if (!articlesHasMore) return;
+  const list = document.getElementById('articles-list');
+  const btn = document.createElement('div');
+  btn.id = 'load-more-btn';
+  btn.style.cssText = 'padding:20px;text-align:center;';
+  btn.innerHTML = `<button class="btn btn-ghost" onclick="fetchArticles(true)" style="min-width:200px;">
+    Charger plus d’articles…
+  </button>`;
+  list.appendChild(btn);
+}
+
+function renderArticlesAppend(articles) {
+  const list = document.getElementById('articles-list');
+  // Appliquer les memes filtres que renderArticles
+  let filtered = [...articles];
+  if (activeKws.size > 0) {
+    filtered = filtered.filter(a => {
+      const text = ((a.title || '') + ' ' + (a.description || '')).toLowerCase();
+      return [...activeKws].some(kw => text.includes(kw));
+    });
+  }
+  if (showUnreadOnly) {
+    filtered = filtered.filter(a => !(a.read_by || []).includes(currentUser.id));
+  }
+  filtered.forEach(a => {
+    const isRead = (a.read_by || []).includes(currentUser.id);
+    const item = document.createElement('div');
+    item.className = 'article-item' + (isRead ? ' is-read' : '');
+    item.dataset.id = a.id;
+    const color = srcColors[a.feed_id] || '#9098b8';
+    const checked = selectedIds.has(a.id) ? 'checked' : '';
+    item.innerHTML = `
+      <div class="article-cb ${checked}" onclick="toggleSelect(event,'${a.id}')"></div>
+      <div>
+        <div class="article-src">
+          <span class="src-dot" style="background:${color}"></span>
+          <span class="src-name">${a.feeds?.label || a.feeds?.url || '—'}</span>
+          ${a.rubrique ? `<span class="article-rubrique">${a.rubrique}</span>` : ''}
+        </div>
+        <div class="article-title">${highlight(a.title, a.feed_id)}</div>
+        ${a.description ? `<div class="article-desc">${highlight(a.description, a.feed_id)}</div>` : ''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="article-date">${relativeDate(a.published_at)}</div>
+        <div class="unread-dot"></div>
+      </div>`;
+    item.querySelector('.article-title').onclick = () => markRead(a, item);
+    list.insertBefore(item, document.getElementById('load-more-btn'));
+  });
+  updateSelectionInfo();
 }
 
 function highlight(text, feedId) {
