@@ -1504,6 +1504,15 @@ async function deleteTeam(teamId, teamName) {
   loadTeamsPage();
 }
 
+async function removeMember(teamId, userId, userName) {
+  if (!confirm(`Retirer ${userName} de cette équipe ?`)) return;
+  const { error } = await sb.from('team_members')
+    .delete().eq('team_id', teamId).eq('user_id', userId);
+  if (error) { toast(error.message, true); return; }
+  toast(`${userName} retiré de l'équipe`);
+  loadTeamsPage();
+}
+
 async function createTeamFromPage() {
   const input = document.getElementById('team-name-input');
   const name = input.value.trim();
