@@ -1526,22 +1526,7 @@ async function _createTeam(name) {
   toast(`Équipe "${name}" créée ✓`);
 }
 
-async function inviteToTeam(teamId, teamName) {
-  const email = prompt(`Email de la personne à inviter dans "${teamName}" :`);
-  if (!email) return;
-  // Chercher l'utilisateur par email via profiles
-  const { data: profile } = await sb.from('profiles')
-    .select('id').eq('id',
-      (await sb.auth.admin?.getUserByEmail?.(email))?.data?.user?.id || ''
-    ).single();
-  if (!profile) {
-    toast('Utilisateur non trouvé. Il doit d\'abord créer un compte.', true);
-    return;
-  }
-  const { error } = await sb.from('team_members').insert({ team_id: teamId, user_id: profile.id });
-  if (error) toast(error.message, true);
-  else toast(`${email} ajouté à l'équipe ✓`);
-}
+
 
 // ─────────────────────────────────────────
 // INIT UTILISATEUR
