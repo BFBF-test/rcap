@@ -932,7 +932,7 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
           </div>
         </div>
 
-        <div class="form-section">
+        <div class="form-section" id="account-pw-section">
           <div class="form-section-title">Changer le mot de passe</div>
           <div class="form-group">
             <label>Nouveau mot de passe</label>
@@ -947,7 +947,7 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
           </div>
         </div>
 
-        <div class="form-section" style="border:1.5px solid #fee2e2;background:#fff8f8;">
+        <div class="form-section" id="account-delete-section" style="border:1.5px solid #fee2e2;background:#fff8f8;">
           <div class="form-section-title" style="color:var(--danger);">Supprimer mon compte</div>
           <p style="font-size:13px;color:var(--ink-faint);margin-bottom:16px;">
             Cette action est irréversible. Tous vos espaces personnels, flux et articles associés seront définitivement supprimés. Les espaces d'équipe que vous avez créés seront également supprimés.
@@ -1065,6 +1065,8 @@ body { font-family:'DM Sans',system-ui,sans-serif; background:var(--surface); co
 // CONFIG — remplace ces deux valeurs
 // ─────────────────────────────────────────
 const SUPABASE_URL  = 'https://rmoptpqbcmqxtijuaxbr.supabase.co';
+const DEMO_EMAILS   = ['demo-util@rcap.dev', 'demo-admin@rcap.dev'];
+let isDemoUser      = false; // true si compte de démonstration
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtb3B0cHFiY21xeHRpanVheGJyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwOTAzNjEsImV4cCI6MjA4ODY2NjM2MX0.EFxmW4-EdKPi207T8mT6IriE-IA5Ct2X168l2Gawz2w';
 
 // Détecter un lien magique AVANT que le SDK ne consomme le hash
@@ -1085,6 +1087,21 @@ function getToken() {
 
 // Helper : appel API Supabase avec fetch natif (contourne les problèmes de lock)
 async function sbFetch(path, options = {}) {
+  const method = (options.method || 'GET').toUpperCase();
+
+  // Compte démo : bloquer toutes les écritures silencieusement
+  if (isDemoUser && ['POST', 'PATCH', 'DELETE'].includes(method)) {
+    // Simuler une réponse vide réussie
+    if (method === 'POST') {
+      // Retourner un objet factice avec un id pour ne pas casser les flux qui attendent un résultat
+      try {
+        const body = options.body ? JSON.parse(options.body) : {};
+        return [{ id: 'demo-' + Math.random().toString(36).slice(2), ...body }];
+      } catch { return []; }
+    }
+    return [];
+  }
+
   const token = getToken();
   const { headers: _ignore, ...restOptions } = options;
   const headers = {
@@ -2607,6 +2624,16 @@ async function addToTeam(userId, userName) {
 // INIT UTILISATEUR
 // ─────────────────────────────────────────
 function initUserUI(user) {
+  // Bandeau démo
+  const existingBanner = document.getElementById('demo-banner');
+  if (existingBanner) existingBanner.remove();
+  if (isDemoUser) {
+    const banner = document.createElement('div');
+    banner.id = 'demo-banner';
+    banner.style.cssText = 'position:fixed;bottom:0;left:0;right:0;background:#1B3A6B;color:rgba(255,255,255,0.8);font-size:12px;text-align:center;padding:6px;z-index:9999;letter-spacing:0.03em;';
+    banner.textContent = 'Mode démonstration — vos modifications ne sont pas enregistrées';
+    document.body.appendChild(banner);
+  }
   const name = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Utilisateur';
   document.getElementById('sidebar-name').textContent = name;
   document.getElementById('sidebar-email').textContent = user.email;
@@ -2971,6 +2998,12 @@ function applyAvatar(name, opt) {
 }
 
 function initAccountPage() {
+  // Masquer les sections sensibles pour les comptes démo
+  const pwSection = document.getElementById('account-pw-section');
+  const delSection = document.getElementById('account-delete-section');
+  if (pwSection) pwSection.style.display = isDemoUser ? 'none' : '';
+  if (delSection) delSection.style.display = isDemoUser ? 'none' : '';
+
   const name = currentUser.user_metadata?.display_name || currentUser.email?.split('@')[0] || '';
   const avatarIdx = currentUser.user_metadata?.avatar_idx ?? 0;
   selectedAvatarIdx = avatarIdx;
@@ -3523,6 +3556,7 @@ sb.auth.onAuthStateChange(async (event, session) => {
     }
     const isFirstLoad = !currentUser;
     currentUser = session.user;
+    isDemoUser = DEMO_EMAILS.includes(currentUser.email);
     loginScreen.classList.add('hidden');
     appEl.classList.add('visible');
     initUserUI(currentUser);
