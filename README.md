@@ -32,7 +32,7 @@ RCap a été construit en binôme **humain + IA** (Claude, Anthropic), sur une s
 
 Tout commence par une **instruction structurée et finement détaillée** : contexte du projet, contraintes techniques, conventions de code, règles à ne jamais enfreindre. Ce socle posé, la démarche devient itérative : une fonctionnalité à la fois, formulée en langage naturel, testée en production réelle avant de passer à la suivante.
 
-Chaque échange suit un schéma instruction / questions / réponses / vérification : l'humain exprime un besoin, l'IA propose une implémentation, explique ses choix, identifie les effets de bord. L'humain teste, valide ou recadre.
+Chaque échange suit un schéma instruction / questions / réponses / vérification : l'humain exprime un besoin, l'IA questionne, propose une implémentation, explique ses choix, identifie les effets de bord. L'humain répond, questionne, teste, valide ou recadre.
 
 ### Ce que ça change
 
