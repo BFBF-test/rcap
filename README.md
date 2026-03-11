@@ -7,7 +7,7 @@
 
 ## Pourquoi RCap
 
-**RCap**, c'est trois idées superposées : *cap vers les RSS*, *récap* de l'actualité, et l'app de RC 😉
+**RCap**, c'est trois idées superposées : *récap* de l'actualité, *cap vers les RSS* et l'app de RC 😉
 
 La veille informationnelle est un problème quotidien dans beaucoup d'organisations : trop de sources, trop d'articles, pas assez de temps. Les outils SaaS existants sont souvent trop complexes à configurer pour des non-techniciens, trop chers pour de petites équipes, ou trop opaques sur ce qu'ils font des données.
 
